@@ -1,0 +1,22 @@
+{
+  "name": "@asla/hofetch",
+  "version": "0.0.1",
+  "exports": "./src/mod.ts",
+  "tasks": {
+    "test": "deno run -A npm:vitest run",
+    "check-type": "deno check src test",
+    "check-fmt": "deno fmt src test"
+  },
+  "nodeModulesDir": "auto",
+  "compilerOptions": {
+    "lib": ["dom", "es2020"]
+  },
+  "fmt": {
+    "lineWidth": 120
+  },
+  "publish": {
+    "include": ["README.md", "src/**"]
+  },
+  "imports": {
+  }
+}
