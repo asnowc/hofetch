@@ -5,10 +5,7 @@ export type CreateHoFetchOption = {
    * 自定义 http body 解析。
    * `fetchResult()` 方法和 `createFetchSuite()` 将根据此配置解析 http body。
    */
-  bodyParser?: Record<
-    string,
-    HttpBodyTransformer<any, ReadableStream<Uint8Array>>
-  >;
+  bodyParser?: Record<string, HttpBodyTransformer<any, ReadableStream<Uint8Array>>>;
   /** Fetch API */
   fetch?: (request: Request) => Promise<Response>;
   /**
@@ -37,7 +34,9 @@ export class HoFetch {
     this.#middlewareLinkRoot = {
       async handler(request, next) {
         const hoResponse = await next();
-        if (!hoResponse.ok && !request.ignoreFailedStatus) {
+
+        if (!hoResponse.ok && request.ifFailed !== "ignore") {
+          if (request.ifFailed === "throw-parse") await HoResponse.parserResponseBody(hoResponse);
           throw new HoFetchStatusError(hoResponse);
         }
         await HoResponse.parserResponseBody(hoResponse);
@@ -62,21 +61,12 @@ export class HoFetch {
   }
   #fetch: (request: Request) => Promise<Response>;
   #defaultOrigin?: string;
-  #bodyParser: Record<
-    string,
-    undefined | HttpBodyTransformer<unknown, ReadableStream<Uint8Array>>
-  > = {};
+  #bodyParser: Record<string, undefined | HttpBodyTransformer<unknown, ReadableStream<Uint8Array>>> = {};
   #middlewareLinkRoot: MiddlewareLink;
   #middlewareLinkLast: MiddlewareLink;
   //TODO: 忽略错误
-  fetch<Res = unknown>(
-    pathOrUrl: string | URL,
-    init?: HoFetchOption,
-  ): Promise<HoResponse<Res>>;
-  fetch(
-    requestUrl: string | URL,
-    init: HoFetchOption = {},
-  ): Promise<HoResponse<any>> {
+  fetch<Res = unknown>(pathOrUrl: string | URL, init?: HoFetchOption): Promise<HoResponse<Res>>;
+  fetch(requestUrl: string | URL, init: HoFetchOption = {}): Promise<HoResponse<any>> {
     let url: URL;
     try {
       url = new URL(requestUrl);
@@ -86,9 +76,9 @@ export class HoFetch {
       if (path[0] !== "/") path = "/" + path;
       url = new URL(this.#defaultOrigin + path);
     }
-    const { body, params, method = "GET", ignoreFailedStatus, ...reset } = init;
+    const { body, params, method = "GET", ifFailed, ...reset } = init;
     const hoContext: HoContext = {
-      ignoreFailedStatus,
+      ifFailed,
       body,
       params,
       headers: new Headers(init.headers),
@@ -128,15 +118,12 @@ export class HoFetch {
 
     return new Request(url, {
       ...init,
-      method: context.method,
+      method: context.method.toUpperCase(),
       body,
       headers: context.headers,
     });
   }
-  #handlerMiddleware(
-    link: MiddlewareLink,
-    context: InternalMiddlewareContext,
-  ): Promise<HoResponse<any>> {
+  #handlerMiddleware(link: MiddlewareLink, context: InternalMiddlewareContext): Promise<HoResponse<any>> {
     const handler = link.handler;
     let called = false;
     return handler(context.hoContext, () => {
@@ -155,7 +142,10 @@ export class HoFetch {
     const contentType = hoResponse.headers.get("content-type");
 
     if (contentType) {
-      const bodyParser = this.#bodyParser[contentType];
+      let key = contentType;
+      let i = contentType.indexOf(";");
+      if (i > 0) key = contentType.slice(0, i);
+      const bodyParser = this.#bodyParser[key];
       if (bodyParser) hoResponse.useBodyTransform(bodyParser);
     }
     return hoResponse;
@@ -169,10 +159,7 @@ export class HoFetch {
   }
 }
 
-export type MiddlewareHandler = (
-  context: HoContext,
-  next: () => Promise<HoResponse>,
-) => Promise<HoResponse>;
+export type MiddlewareHandler = (context: HoContext, next: () => Promise<HoResponse>) => Promise<HoResponse>;
 
 type MiddlewareLink = {
   handler: MiddlewareHandler;
@@ -185,7 +172,7 @@ type InternalMiddlewareContext = {
 };
 
 export interface HoContext<Body = unknown, Param = unknown> {
-  ignoreFailedStatus?: boolean;
+  ifFailed?: HoFetchOption["ifFailed"];
   headers: Headers;
   url: URL;
   params: Param;
@@ -194,14 +181,17 @@ export interface HoContext<Body = unknown, Param = unknown> {
 }
 export type URLParamsInit = ConstructorParameters<typeof URLSearchParams>[0];
 
-export type HoFetchOption<Body = any, Param = any> =
-  & Omit<RequestInit, "body" | "window">
-  & {
-    params?: Param;
-    body?: Body;
-    /** 默认情况下，如果 Response.ok 为 false，则抛出异常，如果 ignoreFailedStatus 为 true, 则解析 body 返回*/
-    ignoreFailedStatus?: boolean;
-  };
+export type HoFetchOption<Body = any, Param = any> = Omit<RequestInit, "body" | "window"> & {
+  params?: Param;
+  body?: Body;
+  /**
+   * 默认为 throw.
+   * throw 抛出异常
+   * throw-parse 抛出异常，并解析 body 附带到 error 对象上
+   * ignore，不抛出异常，正常返回
+   */
+  ifFailed?: "ignore" | "throw" | "throw-parse";
+};
 
 function patchParam(from: any, to: URLSearchParams) {
   if (typeof from === "string") {
@@ -227,7 +217,9 @@ export class HoFetchStatusError extends Error {
     super(`Http response is not ok status: ${hoResponse.status}`);
     this.headers = hoResponse.headers;
     this.status = hoResponse.status;
+    this.body = hoResponse.bodyData;
   }
+  body: unknown;
   headers: Headers;
   status: number;
 }

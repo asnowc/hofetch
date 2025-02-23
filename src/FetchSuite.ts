@@ -1,4 +1,4 @@
-import type { HoFetch } from "./HoFetch.ts";
+import type { HoFetch, HoFetchOption } from "./HoFetch.ts";
 import { HoResponse } from "./HoResponse.ts";
 
 export type FetchSuite = {
@@ -99,4 +99,5 @@ type HoFetchParams<Param = any, Body = any> =
 
 export type FetchSuiteOption<Param = any, Body = any> =
   & Omit<RequestInit, "body" | "window">
-  & HoFetchParams<Param, Body>;
+  & HoFetchParams<Param, Body>
+  & Pick<HoFetchOption, "ifFailed">;
