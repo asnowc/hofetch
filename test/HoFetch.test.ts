@@ -23,7 +23,7 @@ test("默认情况下，如果响应不成功的状态码，应抛出异常", as
   });
   await expect(hoFetch.fetch("/test"), "Response.ok 为 false 应抛出异常").rejects.toThrowError(HoFetchStatusError);
   await expect(
-    hoFetch.fetch("/test", { ifFailed: "ignore" }),
+    hoFetch.fetch("/test", { allowFailed: true }),
     "Response.ok 为 false, 但是配置了 ignoreFailedStatus 为 true, 则认为成功",
   ).resolves.instanceof(HoResponse);
 });

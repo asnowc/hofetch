@@ -34,13 +34,13 @@ export class HoFetch {
     this.#middlewareLinkRoot = {
       async handler(request, next) {
         const hoResponse = await next();
-
-        if (!hoResponse.ok && request.ifFailed !== "ignore") {
-          if (request.ifFailed === "throw-parse") await HoResponse.parserResponseBody(hoResponse);
-          throw new HoFetchStatusError(hoResponse);
-        }
         await HoResponse.parserResponseBody(hoResponse);
-        return hoResponse;
+        if (hoResponse.ok) return hoResponse;
+
+        if (request.allowFailed) {
+          if (request.allowFailed === true || request.allowFailed.includes(hoResponse.status)) return hoResponse;
+        }
+        throw new HoFetchStatusError(hoResponse);
       },
     };
     this.#middlewareLinkLast = this.#middlewareLinkRoot;
@@ -64,7 +64,7 @@ export class HoFetch {
   #bodyParser: Record<string, undefined | HttpBodyTransformer<unknown, ReadableStream<Uint8Array>>> = {};
   #middlewareLinkRoot: MiddlewareLink;
   #middlewareLinkLast: MiddlewareLink;
-  //TODO: 忽略错误
+
   fetch<Res = unknown>(pathOrUrl: string | URL, init?: HoFetchOption): Promise<HoResponse<Res>>;
   fetch(requestUrl: string | URL, init: HoFetchOption = {}): Promise<HoResponse<any>> {
     let url: URL;
@@ -76,9 +76,9 @@ export class HoFetch {
       if (path[0] !== "/") path = "/" + path;
       url = new URL(this.#defaultOrigin + path);
     }
-    const { body, params, method = "GET", ifFailed, ...reset } = init;
+    const { body, params, method = "GET", allowFailed, ...reset } = init;
     const hoContext: HoContext = {
-      ifFailed,
+      allowFailed,
       body,
       params,
       headers: new Headers(init.headers),
@@ -137,7 +137,8 @@ export class HoFetch {
   }
   async #middlewareFinalFetch(context: InternalMiddlewareContext) {
     const request = this.#createRequest(context.hoContext, context.fetchInit);
-    const response = await this.#fetch(request);
+    const fetch = this.#fetch;
+    const response = await fetch(request);
     const hoResponse = new HoResponse(response);
     const contentType = hoResponse.headers.get("content-type");
 
@@ -172,7 +173,7 @@ type InternalMiddlewareContext = {
 };
 
 export interface HoContext<Body = unknown, Param = unknown> {
-  ifFailed?: HoFetchOption["ifFailed"];
+  allowFailed?: boolean | number[];
   headers: Headers;
   url: URL;
   params: Param;
@@ -185,12 +186,9 @@ export type HoFetchOption<Body = any, Param = any> = Omit<RequestInit, "body" | 
   params?: Param;
   body?: Body;
   /**
-   * 默认为 throw.
-   * throw 抛出异常
-   * throw-parse 抛出异常，并解析 body 附带到 error 对象上
-   * ignore，不抛出异常，正常返回
+   * 如果为 true, 则请求状态码如果失败，仍返回结果
    */
-  ifFailed?: "ignore" | "throw" | "throw-parse";
+  allowFailed?: boolean | number[];
 };
 
 function patchParam(from: any, to: URLSearchParams) {
