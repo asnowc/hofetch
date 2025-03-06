@@ -193,12 +193,42 @@ export type HoFetchOption<Body = any, Param = any> = Omit<RequestInit, "body" | 
 
 function patchParam(from: any, to: URLSearchParams) {
   if (typeof from === "string") {
-    from = new URLSearchParams(from);
-  } else if (!(from instanceof URLSearchParams)) {
-    from = new URLSearchParams(from);
+    mergeURLSearchParams(new URLSearchParams(from), to);
+  } else if (typeof from === "object") {
+    if (from instanceof URLSearchParams) {
+      mergeURLSearchParams(from, to);
+    } else {
+      for (const k of Object.keys(from)) {
+        const value = from[k];
+        switch (typeof value) {
+          case "string":
+            to.append(k, value);
+            break;
+          case "number":
+            to.append(k, value.toString());
+            break;
+          case "bigint":
+            to.append(k, value.toString());
+            break;
+          case "boolean":
+            to.append(k, value.toString());
+            break;
+          case "object": {
+            if (value === null) break;
+            if (value instanceof Array) {
+              for (const item of value) to.append(k, item);
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      }
+    }
   }
-
-  for (const [k, v] of from as any) to.set(k, v);
+}
+function mergeURLSearchParams(from: URLSearchParams, to: URLSearchParams) {
+  for (const [k, v] of from as any) to.append(k, v);
 }
 function isBodyInitObj(obj: any) {
   return (
