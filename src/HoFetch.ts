@@ -34,7 +34,7 @@ export class HoFetch {
     this.#middlewareLinkRoot = {
       async handler(request, next) {
         const hoResponse = await next();
-        await HoResponse.parserResponseBody(hoResponse);
+        await hoResponse.parseBody();
         if (hoResponse.ok) return hoResponse;
 
         if (request.allowFailed) {
@@ -47,18 +47,7 @@ export class HoFetch {
 
     this.#defaultOrigin = option.defaultOrigin ?? globalThis.location?.origin;
   }
-  async parseBody<T = unknown>(response: Response): Promise<T> {
-    if (!response.body) return undefined as T;
-    let contentType = response.headers.get("content-type");
-    if (contentType) {
-      const i = contentType.indexOf(";");
-      if (i > 0) contentType = contentType.slice(0, i);
-    } else return response.body as T;
 
-    const parser = this.#bodyParser[contentType];
-    if (parser) return parser(response.body, response) as any;
-    return response.body as T;
-  }
   #fetch: (request: Request) => Promise<Response>;
   #defaultOrigin?: string;
   #bodyParser: Record<string, undefined | HttpBodyTransformer<unknown, ReadableStream<Uint8Array>>> = {};
@@ -66,7 +55,7 @@ export class HoFetch {
   #middlewareLinkLast: MiddlewareLink;
 
   fetch<Res = unknown>(pathOrUrl: string | URL, init?: HoFetchOption): Promise<HoResponse<Res>>;
-  fetch(requestUrl: string | URL, init: HoFetchOption = {}): Promise<HoResponse<any>> {
+  async fetch(requestUrl: string | URL, init: HoFetchOption = {}): Promise<HoResponse<any>> {
     let url: URL;
     try {
       url = new URL(requestUrl);
@@ -78,6 +67,7 @@ export class HoFetch {
     }
     const { body, params, method = "GET", allowFailed, ...reset } = init;
     const hoContext: HoContext = {
+      ...reset,
       allowFailed,
       body,
       params,
@@ -91,42 +81,13 @@ export class HoFetch {
     });
   }
 
-  #createRequest(context: HoContext, init: HoFetchOption): Request {
-    const url = context.url;
-    if (context.params) patchParam(context.params, url.searchParams);
-
-    let body: BodyInit | null | undefined;
-    const rawBody = context.body;
-    switch (typeof rawBody) {
-      case "string":
-        body = rawBody;
-        break;
-      case "object": {
-        if (rawBody === null) break;
-        if (isBodyInitObj(rawBody)) body = rawBody;
-        else {
-          body = JSON.stringify(context.body);
-          if (!context.headers.has("content-type")) {
-            context.headers.set("content-type", "application/json");
-          }
-        }
-        break;
-      }
-      default:
-        break;
-    }
-
-    return new Request(url, {
-      ...init,
-      method: context.method.toUpperCase(),
-      body,
-      headers: context.headers,
-    });
-  }
-  #handlerMiddleware(link: MiddlewareLink, context: InternalMiddlewareContext): Promise<HoResponse<any>> {
+  #handlerMiddleware(
+    link: MiddlewareLink,
+    context: InternalMiddlewareContext
+  ): Promise<HoResponse<any>> | HoResponse<any> {
     const handler = link.handler;
     let called = false;
-    return handler(context.hoContext, () => {
+    const result = handler(context.hoContext, async () => {
       if (called) {
         throw new HoFetchMiddlewareInternalError("next hook already called");
       }
@@ -134,11 +95,17 @@ export class HoFetch {
       if (link.next) return this.#handlerMiddleware(link.next, context);
       return this.#middlewareFinalFetch(context);
     });
+
+    if (result instanceof Promise) return result.then((res) => this.#toHoResponse(res));
+    return this.#toHoResponse(result);
   }
-  async #middlewareFinalFetch(context: InternalMiddlewareContext) {
-    const request = this.#createRequest(context.hoContext, context.fetchInit);
-    const fetch = this.#fetch;
-    const response = await fetch(request);
+  #toHoResponse(res: unknown) {
+    if (res instanceof HoResponse) return res;
+    else if (res instanceof Response) return this.createHoResponse(res);
+
+    throw new Error("The result must be an instance of Response or HoResponse");
+  }
+  createHoResponse(response: Response) {
     const hoResponse = new HoResponse(response);
     const contentType = hoResponse.headers.get("content-type");
 
@@ -151,6 +118,12 @@ export class HoFetch {
     }
     return hoResponse;
   }
+  async #middlewareFinalFetch(context: InternalMiddlewareContext) {
+    const request = contextToRequest(context.hoContext, context.fetchInit);
+    const fetch = this.#fetch;
+    const response = await fetch(request);
+    return this.createHoResponse(response);
+  }
   use(handler: MiddlewareHandler) {
     const link: MiddlewareLink = {
       handler,
@@ -160,7 +133,10 @@ export class HoFetch {
   }
 }
 
-export type MiddlewareHandler = (context: HoContext, next: () => Promise<HoResponse>) => Promise<HoResponse>;
+export type MiddlewareHandler = (
+  context: HoContext,
+  next: () => Promise<HoResponse>
+) => Promise<HoResponse | Response> | HoResponse | Response;
 
 type MiddlewareLink = {
   handler: MiddlewareHandler;
@@ -172,14 +148,16 @@ type InternalMiddlewareContext = {
   fetchInit: any;
 };
 
-export interface HoContext<Body = unknown, Param = unknown> {
-  allowFailed?: boolean | number[];
+export type HoContext<Body = unknown, Param = unknown> = Omit<
+  HoFetchOption,
+  "body" | "params" | "headers" | "method"
+> & {
   headers: Headers;
   url: URL;
   params: Param;
   method: string;
   body: Body;
-}
+};
 export type URLParamsInit = ConstructorParameters<typeof URLSearchParams>[0];
 
 export type HoFetchOption<Body = any, Param = any> = Omit<RequestInit, "body" | "window"> & {
@@ -189,7 +167,41 @@ export type HoFetchOption<Body = any, Param = any> = Omit<RequestInit, "body" | 
    * 如果为 true, 则请求状态码如果失败，仍返回结果
    */
   allowFailed?: boolean | number[];
+  [x: symbol]: any;
 };
+
+function contextToRequest(context: HoContext, init: HoFetchOption): Request {
+  const url = context.url;
+  if (context.params) patchParam(context.params, url.searchParams);
+
+  let body: BodyInit | null | undefined;
+  const rawBody = context.body;
+  switch (typeof rawBody) {
+    case "string":
+      body = rawBody;
+      break;
+    case "object": {
+      if (rawBody === null) break;
+      if (isBodyInitObj(rawBody)) body = rawBody;
+      else {
+        body = JSON.stringify(context.body);
+        if (!context.headers.has("content-type")) {
+          context.headers.set("content-type", "application/json");
+        }
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  return new Request(url, {
+    ...init,
+    method: context.method.toUpperCase(),
+    body,
+    headers: context.headers,
+  });
+}
 
 function patchParam(from: any, to: URLSearchParams) {
   if (typeof from === "string") {
