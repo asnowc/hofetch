@@ -12,6 +12,8 @@ export type CreateHoFetchOption = {
    * @defaultValue globalThis.location?.origin
    */
   defaultOrigin?: string;
+  /** 自定义异常 */
+  createStatusError?: (hoResponse: HoResponse<unknown>) => Error | undefined;
 };
 
 //web api
@@ -31,6 +33,7 @@ export class HoFetch {
       },
       ...option.bodyParser,
     };
+    const { createStatusError } = option;
     this.#middlewareLinkRoot = {
       async handler(request, next) {
         const hoResponse = await next();
@@ -40,14 +43,15 @@ export class HoFetch {
         if (request.allowFailed) {
           if (request.allowFailed === true || request.allowFailed.includes(hoResponse.status)) return hoResponse;
         }
-        throw new HoFetchStatusError(hoResponse);
+        let error: Error | undefined;
+        if (createStatusError) error = createStatusError(hoResponse);
+        throw error ?? new HoFetchStatusError(hoResponse);
       },
     };
     this.#middlewareLinkLast = this.#middlewareLinkRoot;
 
     this.#defaultOrigin = option.defaultOrigin ?? globalThis.location?.origin;
   }
-
   #fetch: (request: Request) => Promise<Response>;
   #defaultOrigin?: string;
   #bodyParser: Record<string, undefined | HttpBodyTransformer<unknown, ReadableStream<Uint8Array>>> = {};
@@ -253,14 +257,29 @@ function isBodyInitObj(obj: any) {
 }
 
 export class HoFetchStatusError extends Error {
-  constructor(hoResponse: HoResponse) {
-    super(`Http response is not ok status: ${hoResponse.status}`);
+  constructor(hoResponse: HoResponse, message?: string) {
+    let bodyMessage = hoResponse.bodyData ?? null;
+    if (!message) {
+      if (typeof bodyMessage === "object" && bodyMessage !== null) {
+        const constructor = getConstructor(bodyMessage);
+        if (constructor) message = constructor.name;
+      } else message = `${hoResponse.status}: ` + bodyMessage;
+    }
+
+    super(message);
     this.headers = hoResponse.headers;
     this.status = hoResponse.status;
-    this.body = hoResponse.bodyData;
+    this.body = bodyMessage;
   }
   body: unknown;
   headers: Headers;
   status: number;
 }
 export class HoFetchMiddlewareInternalError extends Error {}
+function getConstructor(obj: object): Function | undefined {
+  const proto = Reflect.getPrototypeOf(obj);
+  if (!proto) return;
+  const constructor = Reflect.get(proto, "constructor");
+  if (typeof constructor !== "function") return;
+  return constructor;
+}

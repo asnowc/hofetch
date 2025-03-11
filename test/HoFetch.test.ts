@@ -95,3 +95,21 @@ async function decodeText(stream: ReadableStream<Uint8Array>) {
   const textList = await Array.fromAsync(stream.pipeThrough(new TextDecoderStream()));
   return textList.join("");
 }
+test("自定义异常", async function ({ mockFetch }) {
+  const hoFetch = new HoFetch({
+    fetch: mockFetch,
+    createStatusError(hoResponse) {
+      if (hoResponse.status === 400 && typeof hoResponse.bodyData === "string") return new Error(hoResponse.bodyData);
+    },
+    defaultOrigin: "http://127.0.0.1",
+  });
+  mockFetch.mockImplementationOnce(async () => {
+    return new Response("出错了", { status: 400, headers: { "content-type": "text/plain" } });
+  });
+  await expect(hoFetch.fetch("/test", {}), "bodyData 为 object 类型").rejects.toThrowError("出错了");
+
+  mockFetch.mockImplementationOnce(async () => {
+    return new Response("出错了", { status: 403, headers: { "content-type": "text/plain" } });
+  });
+  await expect(hoFetch.fetch("/test", {}), "bodyData 为 object 类型").rejects.toThrowError(HoFetchStatusError);
+});
