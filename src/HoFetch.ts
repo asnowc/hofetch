@@ -31,6 +31,9 @@ export class HoFetch {
       "text/plain": function (data, response) {
         return response.text();
       },
+      "text/html": function (data, response) {
+        return response.text();
+      },
       ...option.bodyParser,
     };
     const { createStatusError } = option;
@@ -87,7 +90,7 @@ export class HoFetch {
 
   #handlerMiddleware(
     link: MiddlewareLink,
-    context: InternalMiddlewareContext
+    context: InternalMiddlewareContext,
   ): Promise<HoResponse<any>> | HoResponse<any> {
     const handler = link.handler;
     let called = false;
@@ -139,7 +142,7 @@ export class HoFetch {
 
 export type MiddlewareHandler = (
   context: HoContext,
-  next: () => Promise<HoResponse>
+  next: () => Promise<HoResponse>,
 ) => Promise<HoResponse | Response> | HoResponse | Response;
 
 type MiddlewareLink = {
