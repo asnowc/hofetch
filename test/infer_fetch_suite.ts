@@ -8,7 +8,7 @@ function type() {
   api["base/r1"].fetch();
   api["base/r1"].delete({});
 
-  api["base/r1"].get({ params: { acc: 1 } });
+  api["base/r1"].get({ query: { acc: 1 } });
   //@ts-expect-error 参数不正确，需要 acc
   api["base/r1"].get({});
   //@ts-expect-error 参数不正确，需要 传入参数
@@ -24,7 +24,7 @@ export type ApiSuite = {
   "GET base/r1": {
     /** 响应值 */
     response: undefined;
-    params: {
+    query: {
       /** 77 */
       acc: number;
     };

@@ -12,7 +12,7 @@ import hoFetch from "@asla/hoFetch";
 const { status, bodyData, headers } = await hoFetch.fetch("/test?p1=9", {
   method: "abc",
   body: { key: 1234 },
-  params: { search: "abc" },
+  query: { search: "abc" },
 });
 ```
 
@@ -63,7 +63,7 @@ export type ApiSuite = {
   "GET base/r1": {
     /** 响应值 */
     response: undefined;
-    params: {
+    query: {
       /** 77 */
       acc: number;
     };
@@ -84,7 +84,7 @@ api["base/r1"].delete(undefined);
 api["base/r1"].fetch();
 api["base/r1"].delete({});
 
-api["base/r1"].get({ params: { acc: 1 } });
+api["base/r1"].get({ query: { acc: 1 } });
 //@ts-expect-error 参数不正确，需要 acc
 api["base/r1"].get({});
 //@ts-expect-error 参数不正确，需要 传入参数

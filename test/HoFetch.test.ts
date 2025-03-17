@@ -1,20 +1,36 @@
-import { expect } from "vitest";
+import { describe, expect, Mock } from "vitest";
 import { test } from "./fixture/hofetch.ts";
 import { HoFetch, HoFetchStatusError, HoResponse } from "../src/mod.ts";
 test("请求与响应", async function ({ hoFetch, mockFetch }) {
   const response = await hoFetch.fetch("/test?p1=9", {
     method: "abc",
     body: { key: 1234 },
-    params: { search: "abc" },
+    query: { search: "abc" },
   });
   expect(response.status).toBe(200);
 
   const request = mockFetch.mock.calls[0][0] as Request;
   expect(request).instanceof(Request);
-  expect(new URL(request.url).search, "由默认转换器转换 params 参数").toBe("?p1=9&search=abc");
+  expect(new URL(request.url).search, "由默认转换器转换 query 参数").toBe("?p1=9&search=abc");
   expect(request.method).toBe("ABC");
   await expect(request.json(), "由默认转换器转换 body 参数").resolves.toEqual({
     key: 1234,
+  });
+});
+describe("query相关", function () {
+  function getSearch(mockFetch: Mock<(request: Request) => Promise<Response>>, index = 0) {
+    const request = mockFetch.mock.calls[index][0] as Request;
+    return new URL(request.url).searchParams;
+  }
+  test("query 参数和 path 的 searchparams 都会被添加", async function ({ hoFetch, mockFetch }) {
+    const response = await hoFetch.fetch("/test?p1=9", { query: { p1: "10" } });
+    const requestSearch = getSearch(mockFetch, 0);
+    expect(requestSearch.toString(), "由默认转换器转换 query 参数").toBe("p1=9&p1=10");
+  });
+  test("query 参数 会覆盖 path 的 searchparams", async function ({ hoFetch, mockFetch }) {
+    const response = await hoFetch.fetch("/test", { query: { p1: "10", boolean: true, items: [true, 1, "abc"] } });
+    const requestSearch = getSearch(mockFetch, 0);
+    expect(requestSearch.toString()).toBe("p1=10&boolean=true&items=true&items=1&items=abc");
   });
 });
 test("默认情况下，如果响应不成功的状态码，应抛出异常", async function ({ hoFetch, mockFetch }) {
@@ -22,10 +38,9 @@ test("默认情况下，如果响应不成功的状态码，应抛出异常", as
     return new Response(null, { status: 404 });
   });
   await expect(hoFetch.fetch("/test"), "Response.ok 为 false 应抛出异常").rejects.toThrowError(HoFetchStatusError);
-  await expect(
-    hoFetch.fetch("/test", { allowFailed: true }),
-    "Response.ok 为 false, 但是配置了 ignoreFailedStatus 为 true, 则认为成功"
-  ).resolves.instanceof(HoResponse);
+  await expect(hoFetch.fetch("/test", { allowFailed: true })).resolves.instanceof(HoResponse);
+  await expect(hoFetch.fetch("/test", { allowFailed: [404] })).resolves.instanceof(HoResponse);
+  await expect(hoFetch.fetch("/test", { allowFailed: [401] })).rejects.toThrowError(HoFetchStatusError);
 });
 test("默认能够解析带 application/json body", async function ({ hoFetch, mockFetch }) {
   mockFetch.mockImplementation(async () => {

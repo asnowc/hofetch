@@ -72,12 +72,12 @@ export class HoFetch {
       if (path[0] !== "/") path = "/" + path;
       url = new URL(this.#defaultOrigin + path);
     }
-    const { body, params, method = "GET", allowFailed, ...reset } = init;
+    const { body, query, method = "GET", allowFailed, ...reset } = init;
     const hoContext: HoContext = {
       ...reset,
       allowFailed,
       body,
-      params,
+      query,
       headers: new Headers(init.headers),
       method,
       url,
@@ -90,7 +90,7 @@ export class HoFetch {
 
   #handlerMiddleware(
     link: MiddlewareLink,
-    context: InternalMiddlewareContext,
+    context: InternalMiddlewareContext
   ): Promise<HoResponse<any>> | HoResponse<any> {
     const handler = link.handler;
     let called = false;
@@ -142,7 +142,7 @@ export class HoFetch {
 
 export type MiddlewareHandler = (
   context: HoContext,
-  next: () => Promise<HoResponse>,
+  next: () => Promise<HoResponse>
 ) => Promise<HoResponse | Response> | HoResponse | Response;
 
 type MiddlewareLink = {
@@ -155,20 +155,20 @@ type InternalMiddlewareContext = {
   fetchInit: any;
 };
 
-export type HoContext<Body = unknown, Param = unknown> = Omit<
+export type HoContext<Body = unknown, Query = unknown> = Omit<
   HoFetchOption,
-  "body" | "params" | "headers" | "method"
+  "body" | "query" | "headers" | "method"
 > & {
   headers: Headers;
   url: URL;
-  params: Param;
+  query: Query;
   method: string;
   body: Body;
 };
 export type URLParamsInit = ConstructorParameters<typeof URLSearchParams>[0];
 
-export type HoFetchOption<Body = any, Param = any> = Omit<RequestInit, "body" | "window"> & {
-  params?: Param;
+export type HoFetchOption<Body = any, Query = any> = Omit<RequestInit, "body" | "window"> & {
+  query?: Query;
   body?: Body;
   /**
    * 如果为 true, 则请求状态码如果失败，仍返回结果
@@ -179,7 +179,7 @@ export type HoFetchOption<Body = any, Param = any> = Omit<RequestInit, "body" | 
 
 function contextToRequest(context: HoContext, init: HoFetchOption): Request {
   const url = context.url;
-  if (context.params) patchParam(context.params, url.searchParams);
+  if (context.query) patchParam(context.query, url.searchParams);
 
   let body: BodyInit | null | undefined;
   const rawBody = context.body;
