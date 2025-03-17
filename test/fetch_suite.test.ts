@@ -1,5 +1,5 @@
 import { createFetchSuite, FetchSuite, HoFetch } from "../src/mod.ts";
-import { beforeEach, expect } from "vitest";
+import { beforeEach, describe, expect } from "vitest";
 import { Context as BaseContext, test as baseTest } from "./fixture/hofetch.ts";
 
 interface ExtraContext {
@@ -42,5 +42,13 @@ test("FetchSuiteBase.fetch", async function ({ fetchSuite }) {
   await expect(fetchRaw.bodyData).toMatchObject({
     path: "/test",
     method: "GET",
+  });
+});
+
+describe("params 解析", function () {
+  test("params 替换", async function ({ fetchSuite, mockFetch }) {
+    await fetchSuite["/:p1/value/:p2"].fetch({ params: { p1: "data" } });
+    const request: Request = mockFetch.mock.calls[0][0];
+    expect(new URL(request.url).pathname).toBe("/data/value/:p2");
   });
 });

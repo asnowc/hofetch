@@ -53,7 +53,24 @@ export class FetchSuiteBase {
     return bodyData as Res;
   }
   fetch = <Res = unknown>(option?: FetchSuiteOption<any>): Promise<HoResponse<Res>> => {
-    return this.#asFetch.fetch(this.#pathOrUrl, option);
+    let url: string | URL = this.#pathOrUrl;
+    const params = option?.params ?? {};
+    if (params) {
+      const replace = (pathname: string) => {
+        return pathname.replace(/(?<=\/):([^/]+)/g, (match, p1) => {
+          const param = params[p1];
+          if (param === undefined) return match;
+          return param;
+        });
+      };
+      if (typeof url === "string") {
+        url = replace(url);
+      } else {
+        url = new URL(url);
+        url.pathname = replace(url.pathname);
+      }
+    }
+    return this.#asFetch.fetch(url, option);
   };
 }
 
