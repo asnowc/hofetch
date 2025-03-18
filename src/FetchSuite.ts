@@ -7,7 +7,7 @@ export type FetchSuite = {
 
 export function createFetchSuite<T extends object>(
   fetchApi: HoFetch,
-  option: { basePath?: string; origin?: string } = {}
+  option: { basePath?: string; origin?: string } = {},
 ): { [x: string]: FetchSuiteBase } & InferFetchSuite<T> {
   const { origin, basePath } = option;
   return new Proxy(
@@ -25,7 +25,7 @@ export function createFetchSuite<T extends object>(
         }
         return createFetchSuiteProxy(fetchApi, next);
       },
-    }
+    },
   ) as any;
 }
 function createFetchSuiteProxy(asFetch: HoFetch, path: string | URL) {
@@ -83,15 +83,16 @@ type EndpointInfo = {
   body?: any;
 };
 /** 推断 api 路径组 */
-export type InferFetchPath<T, Method extends string> = {
-  [key in Method]: T extends EndpointInfo ? FetchEndpoint<T> : never;
-} & FetchSuiteBase;
+export type InferFetchPath<T, Method extends string> =
+  & {
+    [key in Method]: T extends EndpointInfo ? FetchEndpoint<T> : never;
+  }
+  & FetchSuiteBase;
 
 type MapApiKey<T extends object> = {
-  [key in keyof T as key extends `${string} ${string}` ? key : never]: key extends `${infer Method} ${infer Path}`
-    ? {
-        [P in Path]: InferFetchPath<T[key], Lowercase<Method>>;
-      }
+  [key in keyof T as key extends `${string} ${string}` ? key : never]: key extends `${infer Method} ${infer Path}` ? {
+      [P in Path]: InferFetchPath<T[key], Lowercase<Method>>;
+    }
     : never;
 };
 type ObjectValueOf<T extends object> = T[keyof T];
@@ -103,11 +104,12 @@ export type FetchEndpoint<Info extends EndpointInfo = EndpointInfo> = {} extends
   ? (option?: FetchSuiteOption<Info>) => Promise<Info["response"]>
   : (option: FetchSuiteOption<Info>) => Promise<Info["response"]>;
 
-type HoFetchParams<Query = any, Body = any, Param = any> = (undefined extends Query
-  ? { query?: Query }
-  : { query: Query }) &
-  (undefined extends Body ? { body?: Body } : { body: Body }) &
-  (undefined extends Param ? { params?: Param } : { params: Param });
+type HoFetchParams<Query = any, Body = any, Param = any> =
+  & (undefined extends Query ? { query?: Query }
+    : { query: Query })
+  & (undefined extends Body ? { body?: Body } : { body: Body })
+  & (undefined extends Param ? { params?: Param } : { params: Param });
 
-export type FetchSuiteOption<Info extends EndpointInfo = EndpointInfo> = Omit<HoFetchOption, "body" | "query"> &
-  HoFetchParams<Info["query"], Info["body"], Info["params"]>;
+export type FetchSuiteOption<Info extends EndpointInfo = EndpointInfo> =
+  & Omit<HoFetchOption, "body" | "query">
+  & HoFetchParams<Info["query"], Info["body"], Info["params"]>;

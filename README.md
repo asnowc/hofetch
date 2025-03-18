@@ -16,16 +16,17 @@ const { status, bodyData, headers } = await hoFetch.fetch("/test?p1=9", {
 });
 ```
 
-如果 fetch 返回的 Response 对象的 `Response.ok` 为 false, 将抛出 `HoFetchStatusError`
-可以设置 ignoreFailedStatus 为 true 可以忽略该行为
+如果 fetch 返回的 Response 对象的 `Response.ok` 为 false, 将抛出 `HoFetchStatusError` 可以设置 allowFailed 为 true
+可以忽略该行为
 
 ```ts
-await hoFetch.fetch("/test", { ignoreFailedStatus: true });
+await hoFetch.fetch("/test", { allowFailed: true });
 ```
 
 ### 自定义解析 Body
 
-默认情况下，能够自动解析 `application/json` 和 `text/plain` 的响应主体。是未知的 content-type, bodyData 会是 `ReadableStream<Uint8Array>` 类型, 可以通过 配置 HoFetchOptions 的 bodyParser 来更改这个行为
+默认情况下，能够自动解析 `application/json` 和 `text/plain` 的响应主体。是未知的 content-type, bodyData 会是
+`ReadableStream<Uint8Array>` 类型, 可以通过 配置 HoFetchOptions 的 bodyParser 来更改这个行为
 
 ```ts
 const hoFetch = new HoFetch({
@@ -43,8 +44,7 @@ const hoFetch = new HoFetch({
 
 ### FetchSuite
 
-FetchSuite 通过将固定格式的类型转换为 api 类型，这样可以确保类型安全。
-它需要和 Api 类型定义配合使用，单独使用没有意义
+FetchSuite 通过将固定格式的类型转换为 api 类型，这样可以确保类型安全。 它需要和 Api 类型定义配合使用，单独使用没有意义
 
 fetchSuite 单独使用
 

@@ -29,3 +29,5 @@ jobs:
         continue-on-error: true
       - run: deno install
       - run: deno task check-type
+      - run: deno publish --dry-run
+        if: ${{github.ref_name == 'main'}}

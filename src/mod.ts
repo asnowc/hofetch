@@ -4,4 +4,6 @@ export * from "./FetchSuite.ts";
 
 import { HoFetch } from "./HoFetch.ts";
 
-export default new HoFetch();
+const hofetch: HoFetch = new HoFetch();
+
+export default hofetch;

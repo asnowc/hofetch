@@ -1,6 +1,5 @@
 export class HoResponse<T = unknown>
-  implements Pick<Response, "redirected" | "clone" | "ok" | "headers" | "status" | "statusText">
-{
+  implements Pick<Response, "redirected" | "clone" | "ok" | "headers" | "status" | "statusText"> {
   constructor(response: Response) {
     this.#raw = response;
     this.ok = response.ok;
@@ -11,10 +10,10 @@ export class HoResponse<T = unknown>
   }
   #raw: Response;
   #bodyData: T;
-  get bodyData() {
+  get bodyData(): T {
     return this.#bodyData;
   }
-  async parseBody() {
+  async parseBody(): Promise<T> {
     const response = this.#raw;
     if (response.bodyUsed) return this.bodyData;
 
@@ -36,7 +35,7 @@ export class HoResponse<T = unknown>
     this.#transformers.push(bodyMidTransformer);
     return this;
   }
-  get redirected() {
+  get redirected(): boolean {
     return this.#raw.redirected;
   }
   ok: boolean;

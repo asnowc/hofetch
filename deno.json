@@ -5,7 +5,7 @@
   "tasks": {
     "test": "deno run -A npm:vitest run",
     "check-type": "deno check src test",
-    "check-fmt": "deno fmt src test"
+    "check-fmt": "deno fmt --check src test"
   },
   "nodeModulesDir": "auto",
   "compilerOptions": {
@@ -14,6 +14,7 @@
   "fmt": {
     "lineWidth": 120
   },
+  "license": "MIT",
   "publish": {
     "include": ["README.md", "src/**"]
   },

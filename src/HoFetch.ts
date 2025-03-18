@@ -90,7 +90,7 @@ export class HoFetch {
 
   #handlerMiddleware(
     link: MiddlewareLink,
-    context: InternalMiddlewareContext
+    context: InternalMiddlewareContext,
   ): Promise<HoResponse<any>> | HoResponse<any> {
     const handler = link.handler;
     let called = false;
@@ -112,8 +112,8 @@ export class HoFetch {
 
     throw new Error("The result must be an instance of Response or HoResponse");
   }
-  createHoResponse(response: Response) {
-    const hoResponse = new HoResponse(response);
+  createHoResponse<T = unknown>(response: Response): HoResponse<T> {
+    const hoResponse = new HoResponse<T>(response);
     const contentType = hoResponse.headers.get("content-type");
 
     if (contentType) {
@@ -142,7 +142,7 @@ export class HoFetch {
 
 export type MiddlewareHandler = (
   context: HoContext,
-  next: () => Promise<HoResponse>
+  next: () => Promise<HoResponse>,
 ) => Promise<HoResponse | Response> | HoResponse | Response;
 
 type MiddlewareLink = {
@@ -155,16 +155,18 @@ type InternalMiddlewareContext = {
   fetchInit: any;
 };
 
-export type HoContext<Body = unknown, Query = unknown> = Omit<
-  HoFetchOption,
-  "body" | "query" | "headers" | "method"
-> & {
-  headers: Headers;
-  url: URL;
-  query: Query;
-  method: string;
-  body: Body;
-};
+export type HoContext<Body = unknown, Query = unknown> =
+  & Omit<
+    HoFetchOption,
+    "body" | "query" | "headers" | "method"
+  >
+  & {
+    headers: Headers;
+    url: URL;
+    query: Query;
+    method: string;
+    body: Body;
+  };
 export type URLParamsInit = ConstructorParameters<typeof URLSearchParams>[0];
 
 export type HoFetchOption<Body = any, Query = any> = Omit<RequestInit, "body" | "window"> & {
