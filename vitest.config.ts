@@ -1,6 +1,3 @@
-import tsconfigPaths from "vite-tsconfig-paths";
+import { defineConfig } from "vitest/config";
 
-export default {
-  esbuild: { target: "esnext" },
-  plugins: [tsconfigPaths({})],
-};
+export default defineConfig({});
