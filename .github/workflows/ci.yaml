@@ -2,17 +2,18 @@ name: CI
 on:
   push:
     branches:
-      - "*"
+      - "**"
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2
+          cache: true
       - run: deno install
       - name: Test
         run: deno task test
@@ -20,13 +21,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2
+          cache: true
       - run: deno install
       - run: deno task check-type
       - run: deno task check-fmt
+        if: ${{ always() }}
       - run: deno publish --dry-run
         if: ${{github.ref_name == 'main'}}

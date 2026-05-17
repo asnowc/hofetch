@@ -12,8 +12,8 @@ const test = baseTest.extend<ExtraContext>({
   },
 });
 beforeEach<ExtraContext & BaseContext>(({ fetchSuite, mockFetch }) => {
-  mockFetch.mockImplementation(async (req) => {
-    const path = new URL(req.url).pathname;
+  mockFetch.mockImplementation(async (url, req) => {
+    const path = new URL(url).pathname;
     return Response.json({ path, method: req.method });
   });
 });
@@ -48,7 +48,7 @@ test("FetchSuiteBase.fetch", async function ({ fetchSuite }) {
 describe("params 解析", function () {
   test("params 替换", async function ({ fetchSuite, mockFetch }) {
     await fetchSuite["/:p1/value/:p2"].fetch({ params: { p1: "data" } });
-    const request: Request = mockFetch.mock.calls[0][0];
-    expect(new URL(request.url).pathname).toBe("/data/value/:p2");
+    const request: URL = mockFetch.mock.calls[0][0];
+    expect(request.pathname).toBe("/data/value/:p2");
   });
 });
