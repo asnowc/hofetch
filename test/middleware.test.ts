@@ -17,8 +17,8 @@ test("使用中间件，自定义解析 body 参数", async function ({ hoFetch,
     headers: { "content-type": "custom" },
   });
 
-  const req = mockFetch.mock.calls[0][0] as Request;
-  await expect(req.text()).resolves.toBe(JSON.stringify({ k1: "v1" }));
+  const req = mockFetch.mock.calls[0][1];
+  await expect(req.body).toBe(JSON.stringify({ k1: "v1" }));
 });
 test("重复调用中间件的 next()", async function ({ hoFetch }) {
   let nextFn;
@@ -47,4 +47,13 @@ test("中间件不能返回必须返回非 Response 或 HoResponse 实例", asyn
     return 123;
   });
   await expect(hoFetch.fetch("/test", { allowFailed: true })).rejects.toThrowError();
+});
+test("中间件可以修改 credentials", async function ({ hoFetch, mockFetch }) {
+  hoFetch.use(function (ctx: HoContext, next) {
+    ctx.credentials = "include";
+    return next();
+  });
+  await hoFetch.fetch("/test", {});
+  const args = mockFetch.mock.calls[0][1];
+  await expect(args.credentials).toBe("include");
 });

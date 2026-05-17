@@ -1,11 +1,12 @@
 {
   "name": "@asla/hofetch",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "exports": "./src/mod.ts",
   "tasks": {
     "test": "deno x vitest run",
     "check-type": "deno check src test",
-    "check-fmt": "deno fmt --check src test"
+    "check-fmt": "deno fmt --check src test",
+    "fmt": "deno fmt src test"
   },
   "nodeModulesDir": "auto",
   "compilerOptions": {
@@ -19,6 +20,7 @@
     "include": ["README.md", "src/**"]
   },
   "imports": {
-    "vitest": "npm:vitest@^4.0.17"
+    "@deno/vite-plugin": "npm:@deno/vite-plugin@^2.0.2",
+    "vitest": "npm:vitest@^4.1.6"
   }
 }

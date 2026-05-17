@@ -7,7 +7,7 @@ export type CreateHoFetchOption = {
    */
   bodyParser?: Record<string, HttpBodyTransformer<any, ReadableStream<Uint8Array>>>;
   /** Fetch API */
-  fetch?: (request: Request) => Promise<Response>;
+  fetch?: (url: URL, request: RequestInit) => Promise<Response>;
   /**
    * @defaultValue globalThis.location?.origin
    */
@@ -55,7 +55,7 @@ export class HoFetch {
 
     this.#defaultOrigin = option.defaultOrigin ?? globalThis.location?.origin;
   }
-  #fetch: (request: Request) => Promise<Response>;
+  #fetch: (url: URL, request: RequestInit) => Promise<Response>;
   #defaultOrigin?: string;
   #bodyParser: Record<string, undefined | HttpBodyTransformer<unknown, ReadableStream<Uint8Array>>> = {};
   #middlewareLinkRoot: MiddlewareLink;
@@ -82,19 +82,16 @@ export class HoFetch {
       method,
       url,
     };
-    return this.#handlerMiddleware(this.#middlewareLinkRoot, {
-      hoContext,
-      fetchInit: reset,
-    });
+    return this.#handlerMiddleware(this.#middlewareLinkRoot, hoContext);
   }
 
   #handlerMiddleware(
     link: MiddlewareLink,
-    context: InternalMiddlewareContext,
+    context: HoContext,
   ): Promise<HoResponse<any>> | HoResponse<any> {
     const handler = link.handler;
     let called = false;
-    const result = handler(context.hoContext, async () => {
+    const result = handler(context, async () => {
       if (called) {
         throw new HoFetchMiddlewareInternalError("next hook already called");
       }
@@ -125,10 +122,10 @@ export class HoFetch {
     }
     return hoResponse;
   }
-  async #middlewareFinalFetch(context: InternalMiddlewareContext) {
-    const request = contextToRequest(context.hoContext, context.fetchInit);
+  async #middlewareFinalFetch(context: HoContext) {
+    const request = contextToRequest(context);
     const fetch = this.#fetch;
-    const response = await fetch(request);
+    const response = await fetch(context.url, request);
     return this.createHoResponse(response);
   }
   use(handler: MiddlewareHandler) {
@@ -148,11 +145,6 @@ export type MiddlewareHandler = (
 type MiddlewareLink = {
   handler: MiddlewareHandler;
   next?: MiddlewareLink;
-};
-type InternalMiddlewareContext = {
-  called?: boolean;
-  hoContext: HoContext;
-  fetchInit: any;
 };
 
 export type HoContext<Body = unknown, Query = unknown> =
@@ -179,12 +171,11 @@ export type HoFetchOption<Body = any, Query = any> = Omit<RequestInit, "body" | 
   [x: symbol]: any;
 };
 
-function contextToRequest(context: HoContext, init: HoFetchOption): Request {
-  const url = context.url;
-  if (context.query) patchParam(context.query, url.searchParams);
+function contextToRequest(context: HoContext): RequestInit {
+  const { allowFailed, url, query, body: rawBody, ...rest } = context;
+  if (query) patchParam(query, url.searchParams);
 
   let body: BodyInit | null | undefined;
-  const rawBody = context.body;
   switch (typeof rawBody) {
     case "string":
       body = rawBody;
@@ -193,7 +184,7 @@ function contextToRequest(context: HoContext, init: HoFetchOption): Request {
       if (rawBody === null) break;
       if (isBodyInitObj(rawBody)) body = rawBody;
       else {
-        body = JSON.stringify(context.body);
+        body = JSON.stringify(rawBody);
         if (!context.headers.has("content-type")) {
           context.headers.set("content-type", "application/json");
         }
@@ -204,12 +195,12 @@ function contextToRequest(context: HoContext, init: HoFetchOption): Request {
       break;
   }
 
-  return new Request(url, {
-    ...init,
+  return {
+    ...rest,
     method: context.method.toUpperCase(),
     body,
     headers: context.headers,
-  });
+  };
 }
 
 function patchParam(from: any, to: URLSearchParams) {
@@ -251,7 +242,7 @@ function patchParam(from: any, to: URLSearchParams) {
 function mergeURLSearchParams(from: URLSearchParams, to: URLSearchParams) {
   for (const [k, v] of from as any) to.append(k, v);
 }
-function isBodyInitObj(obj: any) {
+function isBodyInitObj(obj: unknown): obj is BodyInit {
   return (
     obj instanceof ArrayBuffer ||
     obj instanceof Uint8Array ||
